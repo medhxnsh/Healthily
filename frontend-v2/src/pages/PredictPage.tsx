@@ -1,12 +1,10 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { runPredict } from '../api/analysis'
 import { useStore } from '../store/useStore'
 import Footer from '../components/Footer'
 
 export default function PredictPage() {
-  const navigate = useNavigate()
   const { parameters, age, sex, selectedSymptoms, predictResult, setPredictResult } = useStore()
 
   const paramInputs = parameters.map((p) => ({ name: p.name, value: p.value, unit: p.unit }))
