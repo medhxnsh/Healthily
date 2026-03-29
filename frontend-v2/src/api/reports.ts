@@ -1,7 +1,5 @@
 import type { APIResponse, UploadReportResponse } from './types'
 
-const BASE = (import.meta.env.VITE_API_BASE_URL ?? '') + '/api/v1'
-
 export async function uploadReport(
   file: File,
   age: number,
@@ -12,7 +10,7 @@ export async function uploadReport(
   form.append('age', String(age))
   form.append('sex', sex)
 
-  const res = await fetch(`${BASE}/reports/upload`, { method: 'POST', body: form })
+  const res = await fetch('/api/v1/reports/upload', { method: 'POST', body: form })
   if (!res.ok) {
     const text = await res.text()
     throw new Error(text || `HTTP ${res.status}`)
