@@ -48,3 +48,9 @@ frontend/dist/
 
 # Claude Code local settings
 .claude/
+frontend/
+stitch/
+
+# Frontend v2 deps
+frontend-v2/node_modules/
+frontend-v2/dist/
