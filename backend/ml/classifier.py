@@ -88,6 +88,31 @@ def load_classifier() -> ClassifierModelData:
 # Feature vector construction
 # ---------------------------------------------------------------------------
 
+_HEALTHY_DEFAULTS: dict[str, float] = {
+    "hemoglobin":      14.0,
+    "rbc":              4.8,
+    "wbc":           6500.0,
+    "platelets":   250000.0,
+    "hematocrit":      42.0,
+    "mcv":             90.0,
+    "mch":             30.0,
+    "mchc":            34.0,
+    "glucose":         85.0,
+    "hba1c":            5.2,
+    "creatinine":       0.9,
+    "bun":             14.0,
+    "alt":             22.0,
+    "ast":             22.0,
+    "alp":             70.0,
+    "bilirubin_total":  0.7,
+    "albumin":          4.2,
+    "tsh":              2.0,
+    "t3":               1.2,
+    "t4":               8.0,
+    "cholesterol":    180.0,
+}
+
+
 def build_feature_vector(
     params: list[BloodParameter],
     feature_names: list[str],
@@ -95,11 +120,13 @@ def build_feature_vector(
 ) -> np.ndarray:
     """
     Map BloodParameter objects onto a fixed-length feature vector.
-    Missing parameters are filled with training-set column medians.
+    Missing parameters are filled with healthy reference midpoints so that
+    absent features do not bias predictions toward the sick training population.
     """
     param_map = {p.name: p.value for p in params}
     vec = np.array(
-        [param_map.get(name, midpoints.get(name, 0.0)) for name in feature_names],
+        [param_map.get(name, _HEALTHY_DEFAULTS.get(name, midpoints.get(name, 0.0)))
+         for name in feature_names],
         dtype=float,
     )
     return vec
