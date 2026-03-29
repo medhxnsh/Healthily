@@ -24,8 +24,8 @@ data/training_data_normalized.csv
 data/classifier_training_data.csv
 data/synthetic_*.csv
 
-# Trained model artifacts — large binary files
-models/*.joblib
+# Trained model artifacts — large binary files (committed for deployment)
+# models/*.joblib
 models/*.pkl
 models/*.json
 
