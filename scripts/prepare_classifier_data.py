@@ -178,6 +178,31 @@ def prepare() -> pd.DataFrame:
     feature_only = merged[FEATURE_COLS]
     merged = merged[feature_only.notna().any(axis=1)].reset_index(drop=True)
 
+    # ── Derived ratio features ──────────────────────────────────────────────
+    # Only computed when both source columns are non-null; otherwise NaN.
+    merged["bun_creatinine_ratio"] = np.where(
+        merged["creatinine"].notna() & (merged["creatinine"] != 0) & merged["bun"].notna(),
+        merged["bun"] / merged["creatinine"],
+        np.nan,
+    )
+    merged["ast_alt_ratio"] = np.where(
+        merged["alt"].notna() & (merged["alt"] != 0) & merged["ast"].notna(),
+        merged["ast"] / merged["alt"],
+        np.nan,
+    )
+    merged["mch_mcv_ratio"] = np.where(
+        merged["mcv"].notna() & (merged["mcv"] != 0) & merged["mch"].notna(),
+        merged["mch"] / merged["mcv"],
+        np.nan,
+    )
+    merged["hemoglobin_rbc_ratio"] = np.where(
+        merged["rbc"].notna() & (merged["rbc"] != 0) & merged["hemoglobin"].notna(),
+        merged["hemoglobin"] / merged["rbc"],
+        np.nan,
+    )
+    print("\nDerived ratio features added: bun_creatinine_ratio, ast_alt_ratio, "
+          "mch_mcv_ratio, hemoglobin_rbc_ratio")
+
     print(f"\nFinal dataset: {len(merged)} rows")
     print(f"Class distribution:")
     for label, count in merged[LABEL_COL].value_counts().items():
