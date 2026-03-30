@@ -80,18 +80,36 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Open `.env` in any text editor and fill in your API keys:
+Open `.env` in any text editor. It will look like this:
 
 ```
 GEMINI_API_KEY=your_gemini_key_here
 GROQ_API_KEY=your_groq_key_here
 ```
 
-**Where to get the keys (both are free):**
-- Groq: https://console.groq.com → API Keys → Create new key (starts with `gsk_`)
-- Gemini: https://aistudio.google.com/apikey → Create API key
+#### Getting your Groq API key (required)
 
-> **Important:** Never export these keys in your shell profile (`.zshrc`, `.bashrc`). Only put them in `.env`. Shell exports override `.env` and cause 401 errors.
+1. Go to https://console.groq.com
+2. Sign up or log in (free)
+3. Click **API Keys** in the left sidebar
+4. Click **Create API Key**
+5. Give it a name (e.g. `healthify-local`)
+6. Copy the key — it starts with `gsk_`
+7. Paste it in `.env` as `GROQ_API_KEY=gsk_your_key_here`
+
+#### Getting your Gemini API key (required for image reports)
+
+1. Go to https://aistudio.google.com/apikey
+2. Sign in with a Google account (free)
+3. Click **Create API key**
+4. Copy and paste it in `.env` as `GEMINI_API_KEY=AIza...`
+
+> **Critical — do not do this:**
+> - Do NOT run `export GROQ_API_KEY=...` in your terminal
+> - Do NOT add it to `.zshrc`, `.bashrc`, or `.bash_profile` (Mac)
+> - Do NOT add it to Windows System Environment Variables
+>
+> Shell/system env vars override `.env` and will cause `401 Invalid API Key` errors every time, even if your `.env` is correct. Only ever put the key in `.env`.
 
 ---
 
@@ -205,18 +223,35 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Open `.env` in Notepad or VS Code and fill in your API keys:
+Open `.env` in Notepad or VS Code. It will look like this:
 
 ```
 GEMINI_API_KEY=your_gemini_key_here
 GROQ_API_KEY=your_groq_key_here
 ```
 
-**Where to get the keys (both are free):**
-- Groq: https://console.groq.com → API Keys → Create new key (starts with `gsk_`)
-- Gemini: https://aistudio.google.com/apikey → Create API key
+#### Getting your Groq API key (required)
 
-> **Important:** Do not set these as Windows System Environment Variables (Control Panel → System → Environment Variables). Only keep them in `.env`. System env vars override `.env` and cause 401 errors.
+1. Go to https://console.groq.com
+2. Sign up or log in (free)
+3. Click **API Keys** in the left sidebar
+4. Click **Create API Key**
+5. Give it a name (e.g. `healthify-local`)
+6. Copy the key — it starts with `gsk_`
+7. Paste it in `.env` as `GROQ_API_KEY=gsk_your_key_here`
+
+#### Getting your Gemini API key (required for image reports)
+
+1. Go to https://aistudio.google.com/apikey
+2. Sign in with a Google account (free)
+3. Click **Create API key**
+4. Copy and paste it in `.env` as `GEMINI_API_KEY=AIza...`
+
+> **Critical — do not do this:**
+> - Do NOT add these keys to Windows System Environment Variables (Control Panel → System → Advanced → Environment Variables)
+> - Do NOT set them in PowerShell with `$env:GROQ_API_KEY = "..."`
+>
+> System/shell env vars override `.env` and will cause `401 Invalid API Key` errors every time, even if your `.env` is correct. Only ever put the key in `.env`.
 
 ---
 
