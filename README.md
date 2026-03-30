@@ -49,7 +49,7 @@ If Node is missing: https://nodejs.org/
 ### Step 2 — Clone the repo
 
 ```bash
-git clone https://github.com/manikapathak/healthify.git
+git clone https://github.com/medhxnsh/Healthily.git
 cd healthify
 ```
 
