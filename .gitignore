@@ -17,7 +17,7 @@ htmlcov/
 MASTER_PROMPT.md
 
 # Large data files — never commit raw datasets
-data/kaggle/
+# data/kaggle/
 data/user_labeled/
 data/training_data.csv
 data/training_data_normalized.csv
