@@ -19,7 +19,7 @@ import structlog
 from openai import AsyncOpenAI, APIError, APITimeoutError, RateLimitError
 
 from backend.config import settings
-from backend.core.parser import BloodParameter, ParseResult, normalize_name
+from backend.core.parser import BloodParameter, ParseResult, normalize_name, normalize_value
 
 logger = structlog.get_logger()
 
@@ -115,6 +115,8 @@ def _build_parameters(raw_items: list[dict]) -> ParseResult:
         if canonical is None:
             unrecognized.append(raw_name)
             continue
+
+        value = normalize_value(canonical, value)
 
         parameters.append(BloodParameter(
             name=canonical,

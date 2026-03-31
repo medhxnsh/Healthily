@@ -1,0 +1,2229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Healthify — AI Blood Report Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =============================================
+   VIEWPORT FIT — MANDATORY BASE
+   ============================================= */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+  background: #0c0c0f;
+}
+
+html {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+}
+
+.slide {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+:root {
+  --crimson: #B84040;
+  --crimson-dim: rgba(184,64,64,0.15);
+  --crimson-glow: rgba(184,64,64,0.35);
+  --bg: #0c0c0f;
+  --surface: #131316;
+  --surface-hi: #1a1a1e;
+  --on: #e8e8e8;
+  --muted: #6a6a6a;
+  --dim: #3a3a3a;
+
+  --title-size: clamp(2.2rem, 6vw, 5rem);
+  --h2-size: clamp(1.4rem, 3.5vw, 2.6rem);
+  --h3-size: clamp(1rem, 2.2vw, 1.5rem);
+  --body-size: clamp(0.78rem, 1.4vw, 1rem);
+  --small-size: clamp(0.65rem, 0.9vw, 0.8rem);
+  --pad: clamp(2rem, 5vw, 5rem);
+  --gap: clamp(0.6rem, 1.5vw, 1.4rem);
+}
+
+/* =============================================
+   SHARED TYPOGRAPHY
+   ============================================= */
+.mono { font-family: 'JetBrains Mono', monospace; }
+.label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--crimson);
+  font-weight: 700;
+}
+
+h1 { font-family: 'Inter', sans-serif; font-weight: 900; font-size: var(--title-size); color: var(--on); line-height: 1.0; letter-spacing: -0.03em; }
+h2 { font-family: 'Inter', sans-serif; font-weight: 800; font-size: var(--h2-size); color: var(--on); line-height: 1.1; letter-spacing: -0.02em; }
+h3 { font-family: 'Inter', sans-serif; font-weight: 700; font-size: var(--h3-size); color: var(--on); line-height: 1.2; }
+p, li { font-family: 'Inter', sans-serif; font-size: var(--body-size); color: #b0b0b0; line-height: 1.6; }
+
+/* =============================================
+   DECORATIVE
+   ============================================= */
+.grid-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(184,64,64,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184,64,64,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+.noise {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.crimson-bar { width: 3px; height: 100%; background: var(--crimson); flex-shrink: 0; }
+
+.accent-line {
+  width: clamp(2rem, 6vw, 5rem);
+  height: 2px;
+  background: var(--crimson);
+  display: block;
+  margin-bottom: clamp(0.8rem, 2vw, 1.5rem);
+}
+
+/* =============================================
+   SLIDE COUNTER / NAV
+   ============================================= */
+#counter {
+  position: fixed;
+  bottom: 2rem; right: 2rem;
+  z-index: 100;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  pointer-events: none;
+}
+
+#progress-bar {
+  position: fixed;
+  top: 0; left: 0;
+  height: 2px;
+  background: var(--crimson);
+  z-index: 100;
+  transition: width 0.3s ease;
+}
+
+/* =============================================
+   REVEAL ANIMATIONS
+   ============================================= */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-24px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal-left.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-left { transition: opacity 0.1s; transform: none; }
+}
+
+/* =============================================
+   SLIDE 1 — COVER
+   ============================================= */
+#s1 {
+  background: var(--bg);
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--pad);
+}
+
+#s1 .cover-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--crimson);
+  margin-bottom: clamp(1rem, 2.5vw, 2rem);
+}
+
+#s1 h1 {
+  font-size: clamp(3.5rem, 9vw, 8rem);
+  color: var(--on);
+  margin-bottom: 0.3em;
+}
+
+#s1 .sub {
+  font-size: clamp(1rem, 2.2vw, 1.6rem);
+  color: var(--muted);
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  max-width: 60ch;
+  margin-bottom: clamp(1.5rem, 4vw, 3rem);
+}
+
+#s1 .cover-pills {
+  display: flex; flex-wrap: wrap; gap: 0.6rem;
+}
+
+#s1 .pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  padding: 0.35em 0.8em;
+  border: 1px solid var(--dim);
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+
+.cover-corner {
+  position: absolute;
+  bottom: var(--pad); right: var(--pad);
+  text-align: right;
+}
+.cover-corner .mono {
+  font-size: var(--small-size);
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  display: block;
+  line-height: 1.8;
+}
+
+/* =============================================
+   SLIDE 2 — THE PROBLEM
+   ============================================= */
+#s2 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+#s2 .problem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1rem, 2.5vw, 2.5rem);
+  margin-top: clamp(1.2rem, 3vw, 2.5rem);
+}
+
+.prob-card {
+  background: var(--surface);
+  border-left: 2px solid var(--crimson);
+  padding: clamp(0.8rem, 1.8vw, 1.5rem);
+}
+
+.prob-card .num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 700;
+  color: var(--crimson);
+  opacity: 0.4;
+  line-height: 1;
+  margin-bottom: 0.4rem;
+}
+
+.prob-card h3 { margin-bottom: 0.4rem; }
+.prob-card p { font-size: var(--small-size); }
+
+/* =============================================
+   SLIDE 3 — WHAT IS HEALTHIFY
+   ============================================= */
+#s3 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+#s3 .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: center;
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+#s3 .feature-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+#s3 .feature-list li {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+
+#s3 .feature-list .icon {
+  width: 6px; height: 6px;
+  background: var(--crimson);
+  flex-shrink: 0;
+  margin-top: 0.5em;
+}
+
+#s3 .stat-box {
+  background: var(--surface);
+  padding: clamp(1rem, 2.5vw, 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.8rem, 1.8vw, 1.5rem);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--surface-hi);
+}
+.stat-row:last-child { border-bottom: none; padding-bottom: 0; }
+
+.stat-row .key {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--muted);
+}
+
+.stat-row .val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--on);
+  font-weight: 700;
+}
+
+/* =============================================
+   SLIDE 4 — TECH STACK
+   ============================================= */
+#s4 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.stack-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(0.6rem, 1.5vw, 1.2rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.stack-card {
+  background: var(--surface);
+  padding: clamp(0.8rem, 1.8vw, 1.4rem);
+  border-top: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.stack-card.active { border-top-color: var(--crimson); }
+
+.stack-card .layer-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.55rem, 0.8vw, 0.7rem);
+  color: var(--crimson);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.stack-card h3 { font-size: var(--body-size); margin-bottom: 0.3rem; }
+.stack-card p { font-size: var(--small-size); color: var(--muted); }
+
+/* =============================================
+   SLIDE 5 — ARCHITECTURE
+   ============================================= */
+#s5 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.arch-flow {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.4rem, 1.2vw, 1rem);
+  margin: clamp(1.2rem, 3vw, 2.5rem) 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.arch-box {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--dim);
+  padding: clamp(0.6rem, 1.4vw, 1.2rem);
+  text-align: center;
+}
+
+.arch-box.highlight { border-color: var(--crimson); background: var(--crimson-dim); }
+
+.arch-box .layer {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.55rem, 0.85vw, 0.72rem);
+  color: var(--crimson);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+.arch-box h3 { font-size: clamp(0.7rem, 1.2vw, 0.95rem); }
+.arch-box p { font-size: clamp(0.6rem, 0.9vw, 0.75rem); color: var(--muted); margin-top: 0.2rem; }
+
+.arch-arrow {
+  color: var(--crimson);
+  font-size: clamp(0.9rem, 1.5vw, 1.3rem);
+  flex-shrink: 0;
+}
+
+.flow-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(0.5rem, 1.2vw, 1rem);
+  margin-top: clamp(0.6rem, 1.5vw, 1.2rem);
+}
+
+.flow-step {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.step-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 0.1em;
+}
+
+.flow-step p { font-size: var(--small-size); }
+
+/* =============================================
+   SLIDE 6 — DATA INGESTION
+   ============================================= */
+#s6 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.ingest-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(0.6rem, 1.5vw, 1.2rem);
+  margin: clamp(1rem, 2.5vw, 2rem) 0;
+}
+
+.ingest-card {
+  background: var(--surface);
+  padding: clamp(0.8rem, 1.8vw, 1.5rem);
+  text-align: center;
+  border-bottom: 2px solid var(--dim);
+}
+
+.ingest-card.primary { border-bottom-color: var(--crimson); }
+
+.ingest-card .fmt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(1.2rem, 3vw, 2.5rem);
+  font-weight: 700;
+  color: var(--crimson);
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.ingest-card h3 { font-size: var(--body-size); margin-bottom: 0.3rem; }
+.ingest-card p { font-size: var(--small-size); color: var(--muted); }
+
+.pipeline-row {
+  display: flex;
+  gap: clamp(0.4rem, 1vw, 0.8rem);
+  align-items: center;
+  margin-top: clamp(0.6rem, 1.5vw, 1.2rem);
+}
+
+.pipe-step {
+  flex: 1;
+  background: var(--surface-hi);
+  padding: clamp(0.4rem, 0.9vw, 0.7rem) clamp(0.6rem, 1.2vw, 1rem);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--on);
+}
+
+/* =============================================
+   SLIDE 7 — AI LAYER
+   ============================================= */
+#s7 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.ai-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+  align-items: start;
+}
+
+.ai-card {
+  background: var(--surface);
+  padding: clamp(1rem, 2.2vw, 1.8rem);
+}
+
+.ai-card .model-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  letter-spacing: 0.15em;
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+.ai-card h3 { margin-bottom: 0.5rem; }
+
+.ai-card .desc { font-size: var(--small-size); margin-bottom: 0.8rem; }
+
+.ai-card .detail-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ai-card .detail-list li {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.6rem, 0.85vw, 0.72rem);
+  color: var(--muted);
+  display: flex;
+  gap: 0.5rem;
+}
+.ai-card .detail-list li::before { content: "→"; color: var(--crimson); }
+
+.groq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--crimson-dim);
+  border: 1px solid var(--crimson);
+  padding: 0.4em 0.8em;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  margin-top: clamp(0.8rem, 2vw, 1.5rem);
+}
+
+/* =============================================
+   SLIDE 8 — ML MODELS
+   ============================================= */
+#s8 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.ml-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(0.6rem, 1.5vw, 1.2rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.ml-card {
+  background: var(--surface);
+  padding: clamp(0.8rem, 1.8vw, 1.5rem);
+  border-left: 3px solid var(--dim);
+  transition: border-color 0.2s;
+}
+
+.ml-card:hover { border-color: var(--crimson); }
+
+.ml-card .algo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  letter-spacing: 0.15em;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.ml-card h3 { font-size: var(--body-size); font-weight: 700; margin-bottom: 0.3rem; }
+.ml-card p { font-size: var(--small-size); }
+
+.ml-card .output {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--surface-hi);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.58rem, 0.82vw, 0.7rem);
+  color: var(--muted);
+}
+
+/* =============================================
+   SLIDE 9 — TRAINING DATA
+   ============================================= */
+#s9 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.data-table thead tr {
+  background: var(--crimson);
+}
+
+.data-table thead th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: white;
+  text-align: left;
+  padding: clamp(0.5rem, 1vw, 0.9rem) clamp(0.6rem, 1.2vw, 1rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.data-table tbody tr:nth-child(even) { background: var(--surface); }
+.data-table tbody tr:nth-child(odd) { background: var(--bg); }
+
+.data-table tbody tr.total-row {
+  background: var(--crimson-dim);
+  border-top: 1px solid var(--crimson);
+}
+
+.data-table tbody td {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--on);
+  padding: clamp(0.4rem, 0.9vw, 0.8rem) clamp(0.6rem, 1.2vw, 1rem);
+}
+
+.data-table tbody td.accent { color: var(--crimson); font-weight: 700; }
+
+.data-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--muted);
+  margin-top: clamp(0.6rem, 1.5vw, 1rem);
+}
+
+/* =============================================
+   SLIDE 10 — 21 FEATURES
+   ============================================= */
+#s10 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.feature-cols {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(0.5rem, 1.2vw, 1rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.feat-group h3 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--dim);
+}
+
+.feat-group ul { list-style: none; }
+.feat-group ul li {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.62rem, 0.9vw, 0.78rem);
+  color: var(--muted);
+  padding: 0.2rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.feat-group ul li::before {
+  content: '';
+  width: 4px; height: 4px;
+  background: var(--dim);
+  flex-shrink: 0;
+}
+
+/* =============================================
+   SLIDE 11 — CONDITIONS PREDICTED
+   ============================================= */
+#s11 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.conditions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(0.5rem, 1.2vw, 1rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.cond-card {
+  background: var(--surface);
+  padding: clamp(0.7rem, 1.5vw, 1.2rem);
+  text-align: center;
+}
+
+.cond-card .cond-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(1.4rem, 3vw, 2.5rem);
+  font-weight: 700;
+  color: var(--crimson);
+  opacity: 0.3;
+  line-height: 1;
+  margin-bottom: 0.3rem;
+}
+
+.cond-card h3 {
+  font-size: clamp(0.68rem, 1.1vw, 0.9rem);
+  font-weight: 600;
+  color: var(--on);
+}
+
+.cond-card .panel-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.55rem, 0.75vw, 0.65rem);
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-top: 0.2rem;
+}
+
+/* =============================================
+   SLIDE 12 — ANOMALY DETECTION
+   ============================================= */
+#s12 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.anomaly-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.anomaly-card {
+  background: var(--surface);
+  padding: clamp(1rem, 2.2vw, 1.8rem);
+}
+
+.anomaly-card .method {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.anomaly-card h3 { font-size: var(--h3-size); margin-bottom: 0.5rem; }
+
+.scale-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.8rem 0;
+}
+
+.scale-bar .bar {
+  flex: 1;
+  height: 6px;
+  background: linear-gradient(to right, #4040B8, #404040, #B84040);
+}
+
+.scale-bar .tick {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.55rem, 0.75vw, 0.65rem);
+  color: var(--muted);
+}
+
+.anomaly-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.anomaly-list li {
+  font-size: var(--small-size);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.anomaly-list li::before { content: "→"; color: var(--crimson); font-family: monospace; }
+
+/* =============================================
+   SLIDE 13 — RISK ENGINE
+   ============================================= */
+#s13 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.risk-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+  align-items: start;
+}
+
+.risk-desc p { font-size: var(--body-size); margin-bottom: var(--gap); }
+
+.risk-example {
+  background: var(--surface);
+  padding: clamp(0.8rem, 1.8vw, 1.5rem);
+}
+
+.risk-bar-item {
+  margin-bottom: clamp(0.6rem, 1.2vw, 1rem);
+}
+
+.risk-bar-item:last-child { margin-bottom: 0; }
+
+.risk-bar-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+
+.risk-bar-header .cname {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--on);
+}
+
+.risk-bar-header .pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  font-weight: 700;
+}
+
+.risk-track {
+  height: 4px;
+  background: var(--surface-hi);
+}
+
+.risk-fill {
+  height: 100%;
+  background: var(--crimson);
+  transition: width 1.2s ease;
+}
+
+/* =============================================
+   SLIDE 14 — SHAP EXPLAINABILITY
+   ============================================= */
+#s14 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.shap-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+  align-items: start;
+}
+
+.shap-desc p { font-size: var(--body-size); margin-bottom: var(--gap); }
+
+.shap-chart {
+  background: var(--surface);
+  padding: clamp(0.8rem, 1.8vw, 1.5rem);
+}
+
+.shap-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: clamp(0.5rem, 1vw, 0.8rem);
+}
+
+.shap-row:last-child { margin-bottom: 0; }
+
+.shap-feat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--muted);
+  width: clamp(4rem, 7vw, 7rem);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.shap-bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+  height: 14px;
+}
+
+.shap-zero {
+  position: absolute;
+  left: 50%;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: var(--dim);
+}
+
+.shap-bar {
+  height: 10px;
+  position: absolute;
+  top: 2px;
+}
+
+.shap-bar.pos { left: 50%; background: var(--crimson); }
+.shap-bar.neg { right: 50%; background: #4040B8; }
+
+.shap-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.58rem, 0.8vw, 0.7rem);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* =============================================
+   SLIDE 15 — API REFERENCE
+   ============================================= */
+#s15 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.api-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.api-table thead tr { background: var(--surface); border-bottom: 2px solid var(--crimson); }
+
+.api-table thead th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--crimson);
+  text-align: left;
+  padding: clamp(0.4rem, 0.9vw, 0.8rem) clamp(0.6rem, 1.2vw, 1rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.api-table tbody tr { border-bottom: 1px solid var(--surface-hi); }
+.api-table tbody tr:last-child { border-bottom: none; }
+
+.api-table tbody td {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--muted);
+  padding: clamp(0.35rem, 0.8vw, 0.7rem) clamp(0.6rem, 1.2vw, 1rem);
+  vertical-align: middle;
+}
+
+.method-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.55rem, 0.75vw, 0.65rem);
+  font-weight: 700;
+  padding: 0.15em 0.5em;
+  letter-spacing: 0.05em;
+}
+
+.method-badge.post { background: rgba(184,64,64,0.15); color: var(--crimson); border: 1px solid var(--crimson); }
+.method-badge.get { background: rgba(64,184,64,0.1); color: #40b840; border: 1px solid #40b840; }
+
+.api-path { color: var(--on); }
+
+/* =============================================
+   SLIDE 16 — KNOWN ISSUE & FIX
+   ============================================= */
+#s16 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.bug-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.bug-side, .fix-side {
+  background: var(--surface);
+  padding: clamp(0.8rem, 1.8vw, 1.5rem);
+}
+
+.bug-side { border-top: 2px solid #6b1a1a; }
+.fix-side { border-top: 2px solid #1a6b2a; }
+
+.side-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+.bug-side .side-tag { color: #c84040; }
+.fix-side .side-tag { color: #40c840; }
+
+.code-block {
+  background: #080808;
+  padding: clamp(0.6rem, 1.2vw, 1rem);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
+  color: var(--muted);
+  line-height: 1.8;
+  margin-top: 0.8rem;
+}
+
+.code-block .kw { color: #B84040; }
+.code-block .str { color: #70a870; }
+.code-block .num { color: #a870a8; }
+.code-block .cmt { color: #505050; }
+
+/* =============================================
+   SLIDE 17 — LIMITATIONS & ROADMAP
+   ============================================= */
+#s17 {
+  background: var(--bg);
+  padding: var(--pad);
+  justify-content: center;
+}
+
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  margin-top: clamp(1rem, 2.5vw, 2rem);
+}
+
+.limit-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.limit-list li {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  font-size: var(--body-size);
+}
+
+.limit-list .badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.55rem, 0.75vw, 0.65rem);
+  padding: 0.15em 0.5em;
+  flex-shrink: 0;
+  margin-top: 0.2em;
+}
+
+.badge.now { background: rgba(184,64,64,0.15); color: var(--crimson); border: 1px solid var(--crimson); }
+.badge.next { background: rgba(184,140,40,0.15); color: #c8a040; border: 1px solid #8a6a20; }
+.badge.future { background: rgba(40,120,184,0.15); color: #4090c8; border: 1px solid #205080; }
+
+/* =============================================
+   SLIDE 18 — CLOSING
+   ============================================= */
+#s18 {
+  background: var(--bg);
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--pad);
+}
+
+#s18 h2 {
+  font-size: clamp(1.2rem, 2.5vw, 2rem);
+  color: var(--muted);
+  font-weight: 300;
+  margin-bottom: clamp(0.5rem, 1.5vw, 1rem);
+}
+
+#s18 h1 {
+  font-size: clamp(2.5rem, 7vw, 6.5rem);
+  margin-bottom: clamp(1rem, 3vw, 2.5rem);
+}
+
+.closing-stats {
+  display: flex;
+  gap: clamp(1.5rem, 4vw, 4rem);
+  margin-top: clamp(1.5rem, 3.5vw, 3rem);
+}
+
+.closing-stat .big {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(1.8rem, 4vw, 3.5rem);
+  font-weight: 700;
+  color: var(--crimson);
+  display: block;
+  line-height: 1;
+}
+
+.closing-stat .desc {
+  font-size: var(--small-size);
+  color: var(--muted);
+  display: block;
+  margin-top: 0.3rem;
+}
+
+.links-row {
+  display: flex;
+  gap: clamp(0.8rem, 2vw, 1.5rem);
+  margin-top: clamp(1.5rem, 3.5vw, 3rem);
+  flex-wrap: wrap;
+}
+
+.link-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--small-size);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.link-item::before { content: "↗"; color: var(--crimson); }
+
+.disclaimer {
+  position: absolute;
+  bottom: var(--pad);
+  left: var(--pad);
+  right: var(--pad);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.5rem, 0.7vw, 0.62rem);
+  color: var(--dim);
+  letter-spacing: 0.05em;
+}
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="progress-bar" style="width:5.56%"></div>
+<div id="counter">01 / 18</div>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 1 — COVER
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s1">
+  <div class="grid-bg"></div>
+  <div class="noise"></div>
+
+  <p class="cover-tag reveal">Blood Report Analysis System &nbsp;—&nbsp; March 2026</p>
+  <h1 class="reveal">HEALTHIFY</h1>
+  <p class="sub reveal">AI-powered blood report analysis that turns clinical lab data into plain-English insights, anomaly scores, and condition predictions.</p>
+
+  <div class="cover-pills reveal">
+    <span class="pill">FastAPI</span>
+    <span class="pill">React 19 + TypeScript</span>
+    <span class="pill">Groq / Llama 4</span>
+    <span class="pill">scikit-learn</span>
+    <span class="pill">SHAP</span>
+    <span class="pill">Railway + Vercel</span>
+  </div>
+
+  <div class="cover-corner">
+    <span class="mono">github.com/medhxnsh/Healthily</span>
+    <span class="mono">6 pages &nbsp;·&nbsp; 8 API endpoints</span>
+    <span class="mono">15 conditions predicted</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 2 — THE PROBLEM
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s2">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">01 — Problem Statement</p>
+  <h2 class="reveal">Blood reports are written for clinicians, not patients.</h2>
+
+  <div class="problem-grid reveal">
+    <div class="prob-card">
+      <div class="num">01</div>
+      <h3>Opaque numbers</h3>
+      <p>Values like "MCH: 24.3 pg" mean nothing to a patient. No context, no severity, no next step.</p>
+    </div>
+    <div class="prob-card">
+      <div class="num">02</div>
+      <h3>Range flags without meaning</h3>
+      <p>A "Low" flag tells you nothing about what condition it might indicate or how worried to be.</p>
+    </div>
+    <div class="prob-card">
+      <div class="num">03</div>
+      <h3>Siloed interpretation</h3>
+      <p>Doctors correlate 20+ parameters together. Patients see individual numbers with no pattern view.</p>
+    </div>
+    <div class="prob-card">
+      <div class="num">04</div>
+      <h3>No accessible tools</h3>
+      <p>Premium health apps charge for AI interpretation. There is no free, intelligent, multi-format alternative.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 3 — WHAT IS HEALTHIFY
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s3">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">02 — Solution</p>
+  <h2 class="reveal">One upload. Six layers of analysis.</h2>
+
+  <div class="two-col">
+    <ul class="feature-list reveal">
+      <li>
+        <span class="icon"></span>
+        <span><strong>Multi-format ingestion</strong> — CSV, PDF, JPG, PNG, WEBP up to 10MB. No manual entry required.</span>
+      </li>
+      <li>
+        <span class="icon"></span>
+        <span><strong>Plain-English AI summary</strong> — Groq Llama 3.3 70B translates clinical values into patient language.</span>
+      </li>
+      <li>
+        <span class="icon"></span>
+        <span><strong>Z-Score anomaly scoring</strong> — Quantifies how far each value is from the healthy reference range.</span>
+      </li>
+      <li>
+        <span class="icon"></span>
+        <span><strong>Isolation Forest detection</strong> — ML detects unusual patterns across all parameters together.</span>
+      </li>
+      <li>
+        <span class="icon"></span>
+        <span><strong>Symptom-aware risk assessment</strong> — Maps blood values + reported symptoms to 15 condition probabilities.</span>
+      </li>
+      <li>
+        <span class="icon"></span>
+        <span><strong>SHAP explainability</strong> — Shows exactly which parameters drove the ML prediction.</span>
+      </li>
+    </ul>
+
+    <div class="stat-box reveal">
+      <div class="stat-row">
+        <span class="key">Input formats</span>
+        <span class="val">CSV · PDF · JPG · PNG · WEBP</span>
+      </div>
+      <div class="stat-row">
+        <span class="key">Parameters tracked</span>
+        <span class="val">21 canonical features</span>
+      </div>
+      <div class="stat-row">
+        <span class="key">Conditions classified</span>
+        <span class="val">15 distinct conditions</span>
+      </div>
+      <div class="stat-row">
+        <span class="key">Training data</span>
+        <span class="val">~3,918 rows (SMOTE) / 6 datasets</span>
+      </div>
+      <div class="stat-row">
+        <span class="key">API endpoints</span>
+        <span class="val">8 (FastAPI)</span>
+      </div>
+      <div class="stat-row">
+        <span class="key">Deployment</span>
+        <span class="val">Railway + Vercel</span>
+      </div>
+      <div class="stat-row">
+        <span class="key">Cost to user</span>
+        <span class="val">Free</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 4 — TECH STACK
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s4">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">03 — Technology Stack</p>
+  <h2 class="reveal">Built on production-grade open-source tools.</h2>
+
+  <div class="stack-grid reveal">
+    <div class="stack-card active">
+      <div class="layer-tag">Backend</div>
+      <h3>FastAPI + Python 3.11</h3>
+      <p>Async REST API · pydantic-settings · structlog · aiosqlite · SQLAlchemy</p>
+    </div>
+    <div class="stack-card active">
+      <div class="layer-tag">AI / LLM</div>
+      <h3>Groq API</h3>
+      <p>llama-3.3-70b-versatile (simplifier) · llama-4-scout-17b (vision parser)</p>
+    </div>
+    <div class="stack-card active">
+      <div class="layer-tag">ML</div>
+      <h3>scikit-learn + SHAP</h3>
+      <p>Logistic Regression · Isolation Forest · StandardScaler · joblib serialisation</p>
+    </div>
+    <div class="stack-card">
+      <div class="layer-tag">Frontend</div>
+      <h3>React 19 + TypeScript + Vite 6</h3>
+      <p>Tailwind CSS v3 · Zustand · TanStack Query · React Router v6</p>
+    </div>
+    <div class="stack-card">
+      <div class="layer-tag">Design</div>
+      <h3>Brutalist Clinical Dark</h3>
+      <p>#0C0C0F background · #B84040 crimson · 0px radius · JetBrains Mono + Inter</p>
+    </div>
+    <div class="stack-card">
+      <div class="layer-tag">Deployment</div>
+      <h3>Railway + Vercel</h3>
+      <p>Backend on Railway (nixpacks) · Frontend on Vercel edge CDN · Proxy via vercel.json</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 5 — ARCHITECTURE
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s5">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">04 — System Architecture</p>
+  <h2 class="reveal">Three decoupled layers. One seamless pipeline.</h2>
+
+  <div class="arch-flow reveal">
+    <div class="arch-box">
+      <div class="layer">User</div>
+      <h3>Blood Report</h3>
+      <p>CSV / PDF / Image</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box">
+      <div class="layer">Presentation</div>
+      <h3>React SPA</h3>
+      <p>Vercel Edge CDN</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box highlight">
+      <div class="layer">Orchestration</div>
+      <h3>FastAPI</h3>
+      <p>Railway Container</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box">
+      <div class="layer">AI Layer</div>
+      <h3>Groq API</h3>
+      <p>Llama 3.3 + Llama 4</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box">
+      <div class="layer">ML Layer</div>
+      <h3>scikit-learn</h3>
+      <p>LR · IF · SHAP</p>
+    </div>
+  </div>
+
+  <div class="flow-steps reveal">
+    <div class="flow-step">
+      <span class="step-num">01</span>
+      <p>File uploaded via multipart POST to <code>/api/v1/reports/upload</code>. Routed by extension to CSV, PDF, or vision parser.</p>
+    </div>
+    <div class="flow-step">
+      <span class="step-num">02</span>
+      <p>Parameters extracted, validated against physical limits, matched to age/sex-adjusted reference ranges.</p>
+    </div>
+    <div class="flow-step">
+      <span class="step-num">03</span>
+      <p>Groq Llama 3.3 generates plain-English summary. Results stored in Zustand global state. Five analysis pages auto-run on mount.</p>
+    </div>
+    <div class="flow-step">
+      <span class="step-num">04</span>
+      <p>Z-Score detector flags individual outliers. Isolation Forest scores the full parameter pattern.</p>
+    </div>
+    <div class="flow-step">
+      <span class="step-num">05</span>
+      <p>Logistic Regression classifies 12 conditions. SHAP explains feature contributions per prediction.</p>
+    </div>
+    <div class="flow-step">
+      <span class="step-num">06</span>
+      <p>Risk engine combines symptom selection + blood values into condition probability scores (0–100%).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 6 — DATA INGESTION
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s6">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">05 — Data Ingestion</p>
+  <h2 class="reveal">Every blood report format accepted. Nothing manual.</h2>
+
+  <div class="ingest-grid reveal">
+    <div class="ingest-card primary">
+      <span class="fmt">CSV</span>
+      <h3>Structured data</h3>
+      <p>Direct column mapping to canonical parameter names. Fastest path — no AI needed.</p>
+    </div>
+    <div class="ingest-card primary">
+      <span class="fmt">PDF</span>
+      <h3>pdfplumber</h3>
+      <p>Text-layer extraction. Regex + heuristics map rows to parameter + value + unit triplets.</p>
+    </div>
+    <div class="ingest-card primary">
+      <span class="fmt">JPG</span>
+      <h3>Vision LLM</h3>
+      <p>Groq Llama 4 Scout 17B parses image, extracts table structure, returns structured JSON.</p>
+    </div>
+    <div class="ingest-card primary">
+      <span class="fmt">PNG</span>
+      <h3>Vision LLM</h3>
+      <p>Same pipeline as JPG. WEBP also supported. Max file size: 10MB.</p>
+    </div>
+  </div>
+
+  <div class="pipeline-row reveal">
+    <div class="pipe-step">File Upload</div>
+    <div class="arch-arrow" style="color:var(--crimson)">→</div>
+    <div class="pipe-step">Extension Router</div>
+    <div class="arch-arrow" style="color:var(--crimson)">→</div>
+    <div class="pipe-step">Parser (CSV / PDF / Vision)</div>
+    <div class="arch-arrow" style="color:var(--crimson)">→</div>
+    <div class="pipe-step">Physical Validation</div>
+    <div class="arch-arrow" style="color:var(--crimson)">→</div>
+    <div class="pipe-step">Reference Range Lookup</div>
+    <div class="arch-arrow" style="color:var(--crimson)">→</div>
+    <div class="pipe-step">BloodParameter Objects</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 7 — AI LAYER
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s7">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">06 — AI Layer</p>
+  <h2 class="reveal">Two Llama models. Two different jobs.</h2>
+
+  <div class="ai-two-col reveal">
+    <div class="ai-card">
+      <span class="model-tag">MODEL 01</span>
+      <h3>llama-3.3-70b-versatile</h3>
+      <p class="desc">Simplifier — turns a table of lab values into a plain-English paragraph a patient can read and act on.</p>
+      <ul class="detail-list">
+        <li>Receives: parameter name, value, unit, status (low/normal/high/critical)</li>
+        <li>Receives: patient age and biological sex for context</li>
+        <li>Returns: 2-4 sentence natural language summary</li>
+        <li>Prompt: explicitly prohibits medical advice language</li>
+        <li>Cached: identical parameter sets reuse prior summary</li>
+      </ul>
+    </div>
+    <div class="ai-card">
+      <span class="model-tag">MODEL 02</span>
+      <h3>llama-4-scout-17b-16e-instruct</h3>
+      <p class="desc">Vision parser — reads blood report images (JPG/PNG/WEBP) and extracts structured parameter data without OCR libraries.</p>
+      <ul class="detail-list">
+        <li>Receives: base64-encoded image at full resolution</li>
+        <li>Returns: JSON array of { name, value, unit, raw_name }</li>
+        <li>Handles: printed tables, handwritten values, non-standard formats</li>
+        <li>Fallback: parse errors surface to user with clear message</li>
+        <li>Post-process: canonical name mapping + physical limit validation</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="groq-badge reveal">
+    Powered by Groq API &nbsp;·&nbsp; OpenAI-compatible endpoint &nbsp;·&nbsp; https://api.groq.com/openai/v1
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 8 — ML MODELS
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s8">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">07 — Machine Learning Models</p>
+  <h2 class="reveal">Four components. Each solves a different problem.</h2>
+
+  <div class="ml-grid reveal">
+    <div class="ml-card">
+      <span class="algo">XGBOOST CLASSIFIER · xgboost</span>
+      <h3>Condition Classifier</h3>
+      <p>Multi-class robust anomaly classifier trained on 3,918 class-balanced rows across 6 clinical datasets. SMOTE scaling solves class imbalances and boosts accuracy to 95%.</p>
+      <div class="output">OUTPUT → 15-class probability distribution · top condition + confidence</div>
+    </div>
+    <div class="ml-card">
+      <span class="algo">ISOLATION FOREST · scikit-learn</span>
+      <h3>Multivariate Anomaly Detector</h3>
+      <p>100 isolation trees, contamination=0.1. Detects unusual patterns across all blood values simultaneously — catches cases where individual values look normal but combined pattern is abnormal.</p>
+      <div class="output">OUTPUT → anomaly score (−1 to +1) per sample · flag per parameter</div>
+    </div>
+    <div class="ml-card">
+      <span class="algo">Z-SCORE · statistical</span>
+      <h3>Per-Parameter Outlier Scorer</h3>
+      <p>Computes (value − reference_mean) / reference_std using age- and sex-adjusted reference ranges from reference_ranges.json. Threshold: |z| &gt; 2.0 flagged. Direction (high/low) returned.</p>
+      <div class="output">OUTPUT → float z-score + direction + is_anomaly bool per parameter</div>
+    </div>
+    <div class="ml-card">
+      <span class="algo">SHAP · TreeExplainer</span>
+      <h3>Feature Importance Explainer</h3>
+      <p>SHapley Additive exPlanations assigned to each feature for the top predicted condition. Positive SHAP = increased prediction probability. Negative = decreased. Visualised as horizontal bar chart.</p>
+      <div class="output">OUTPUT → SHAP value + direction per feature · top contributing parameters</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 9 — TRAINING DATA
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s9">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">08 — Training Data</p>
+  <h2 class="reveal">High-quality real-world clinical datasets. 15 conditions.</h2>
+
+  <table class="data-table reveal">
+    <thead>
+      <tr>
+        <th>Dataset</th>
+        <th>Rows</th>
+        <th>Panel Type</th>
+        <th>Key Features</th>
+        <th>Conditions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>diagnosed_cbc_data_v4.csv</td>
+        <td class="accent">1,281</td>
+        <td>CBC</td>
+        <td>HGB, HCT, RBC, WBC, PLT, MCV, MCH, MCHC</td>
+        <td>9 (anemia types, leukemia, thrombocytopenia)</td>
+      </tr>
+      <tr>
+        <td>cleaned_dataset_Thyroid1.csv</td>
+        <td class="accent">3,771</td>
+        <td>Thyroid</td>
+        <td>TSH, T3, T4</td>
+        <td>2 (hypothyroidism, healthy)</td>
+      </tr>
+      <tr>
+        <td>indian_liver_patient.csv</td>
+        <td class="accent">583</td>
+        <td>Liver</td>
+        <td>Bilirubin, ALT, AST, ALP, Albumin</td>
+        <td>2 (liver_disease, healthy)</td>
+      </tr>
+      <tr>
+        <td>diabetes.csv</td>
+        <td class="accent">768</td>
+        <td>Metabolic</td>
+        <td>Glucose only</td>
+        <td>2 (type_2_diabetes, healthy)</td>
+      </tr>
+      <tr>
+        <td>kidney_disease.csv</td>
+        <td class="accent">400</td>
+        <td>Metabolic</td>
+        <td>Glucose, BUN, Creatinine, Hemoglobin</td>
+        <td>2 (CKD, healthy)</td>
+      </tr>
+      <tr>
+        <td>hcv_dataset.csv</td>
+        <td class="accent">615</td>
+        <td>Liver</td>
+        <td>ALT, AST, Albumin, Bilirubin, Cholesterol</td>
+        <td>4 (hepatitis, fibrosis, cirrhosis, healthy)</td>
+      </tr>
+      <tr class="total-row">
+        <td><strong>TOTAL</strong></td>
+        <td class="accent"><strong>3,918 (SMOTE)</strong></td>
+        <td>Multi-panel</td>
+        <td>22 features (including derived ratios)</td>
+        <td><strong>15 unique conditions</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="data-note reveal">
+    ⚠ &nbsp;Limitation: Each dataset covers one panel type. Missing features are imputed using healthy reference midpoints, not sick-population medians — a critical design decision that prevents prediction bias.
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 10 — 21 FEATURES
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s10">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">09 — Feature Set</p>
+  <h2 class="reveal">21 canonical blood parameters across 4 panels.</h2>
+
+  <div class="feature-cols reveal">
+    <div class="feat-group">
+      <h3>CBC Panel</h3>
+      <ul>
+        <li>hemoglobin</li>
+        <li>rbc</li>
+        <li>wbc</li>
+        <li>platelets</li>
+        <li>hematocrit</li>
+        <li>mcv</li>
+        <li>mch</li>
+        <li>mchc</li>
+      </ul>
+    </div>
+    <div class="feat-group">
+      <h3>Metabolic Panel</h3>
+      <ul>
+        <li>glucose</li>
+        <li>hba1c</li>
+        <li>creatinine</li>
+        <li>bun</li>
+        <li>cholesterol</li>
+      </ul>
+    </div>
+    <div class="feat-group">
+      <h3>Liver Panel</h3>
+      <ul>
+        <li>alt</li>
+        <li>ast</li>
+        <li>alp</li>
+        <li>bilirubin_total</li>
+        <li>albumin</li>
+      </ul>
+    </div>
+    <div class="feat-group">
+      <h3>Thyroid Panel</h3>
+      <ul>
+        <li>tsh</li>
+        <li>t3</li>
+        <li>t4</li>
+      </ul>
+      <h3 style="margin-top:1rem">Classifier uses</h3>
+      <ul>
+        <li>22 generated features</li>
+        <li>4 cross-panel clinical ratios</li>
+        <li>Missing → healthy default</li>
+        <li>SMOTE rebalancing</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 11 — CONDITIONS PREDICTED
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s11">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">10 — Conditions Classified</p>
+  <h2 class="reveal">12 conditions. One model. Probability for each.</h2>
+
+  <div class="conditions-grid reveal">
+    <div class="cond-card">
+      <div class="cond-num">01</div>
+      <h3>Healthy</h3>
+      <div class="panel-tag">Baseline</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">02</div>
+      <h3>Iron Deficiency Anemia</h3>
+      <div class="panel-tag">CBC</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">03</div>
+      <h3>Microcytic Anemia</h3>
+      <div class="panel-tag">CBC</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">04</div>
+      <h3>Macrocytic Anemia</h3>
+      <div class="panel-tag">CBC</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">05</div>
+      <h3>Normocytic Hypochromic</h3>
+      <div class="panel-tag">CBC</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">06</div>
+      <h3>Normocytic Normochromic</h3>
+      <div class="panel-tag">CBC</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">07</div>
+      <h3>Thrombocytopenia</h3>
+      <div class="panel-tag">CBC</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">08</div>
+      <h3>Leukemia</h3>
+      <div class="panel-tag">CBC</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">09</div>
+      <h3>Type 2 Diabetes</h3>
+      <div class="panel-tag">Metabolic</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">10</div>
+      <h3>Chronic Kidney Disease</h3>
+      <div class="panel-tag">Metabolic</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">11</div>
+      <h3>Liver Disease</h3>
+      <div class="panel-tag">Liver</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">12</div>
+      <h3>Hypothyroidism</h3>
+      <div class="panel-tag">Thyroid</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">13</div>
+      <h3>Hepatitis</h3>
+      <div class="panel-tag">Liver</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">14</div>
+      <h3>Fibrosis</h3>
+      <div class="panel-tag">Liver</div>
+    </div>
+    <div class="cond-card">
+      <div class="cond-num">15</div>
+      <h3>Cirrhosis</h3>
+      <div class="panel-tag">Liver</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 12 — ANOMALY DETECTION
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s12">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">11 — Anomaly Detection</p>
+  <h2 class="reveal">Statistical outliers AND pattern-level anomalies.</h2>
+
+  <div class="anomaly-two reveal">
+    <div class="anomaly-card">
+      <div class="method">Method 01 — Statistical</div>
+      <h3>Z-Score Analysis</h3>
+      <p style="font-size:var(--small-size);margin-bottom:0.6rem">Measures how many standard deviations each value sits from the reference mean. Uses age- and sex-adjusted ranges.</p>
+      <div class="scale-bar">
+        <span class="tick">−3</span>
+        <div class="bar"></div>
+        <span class="tick">+3</span>
+      </div>
+      <ul class="anomaly-list">
+        <li>Score near 0 = value is average for healthy population</li>
+        <li>±1 = slightly above/below average, normal range</li>
+        <li>±2 = flagged — worth monitoring</li>
+        <li>±3 = significantly outside normal, see a doctor</li>
+        <li>Direction returned: HIGH or LOW with each score</li>
+      </ul>
+    </div>
+
+    <div class="anomaly-card">
+      <div class="method">Method 02 — Machine Learning</div>
+      <h3>Isolation Forest</h3>
+      <p style="font-size:var(--small-size);margin-bottom:0.6rem">Builds 100 isolation trees. Anomalous samples are isolated in fewer splits. Looks at ALL parameters together — not one at a time.</p>
+      <div class="scale-bar">
+        <span class="tick">−1</span>
+        <div class="bar"></div>
+        <span class="tick">+1</span>
+      </div>
+      <ul class="anomaly-list">
+        <li>Score near +1.0 = pattern matches healthy population</li>
+        <li>Score near −1.0 = pattern is highly unusual</li>
+        <li>Catches cases where individual values look OK but combined pattern is wrong</li>
+        <li>contamination = 0.1 (10% expected anomaly rate)</li>
+        <li>100 estimators, random_state=42</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 13 — RISK ENGINE
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s13">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">12 — Risk Assessment Engine</p>
+  <h2 class="reveal">Symptoms + blood values → condition risk percentages.</h2>
+
+  <div class="risk-layout reveal">
+    <div class="risk-desc">
+      <p>The risk engine maps user-reported symptoms and out-of-range blood values to a set of condition risk scores using a rule-based weighted scoring system backed by <code>symptom_condition_map.json</code> and <code>safety_conditions.json</code>.</p>
+      <p>Each condition gets a score between 0–100% based on how many of its associated symptoms and lab abnormalities are present. Conditions with risk &gt; 0% are shown. The <code>requires_doctor</code> flag is surfaced when risk is non-zero.</p>
+      <p>45+ symptoms supported — formatted from SNAKE_CASE to human-readable labels in the UI.</p>
+    </div>
+
+    <div class="risk-example">
+      <p style="font-family:'JetBrains Mono',monospace;font-size:var(--small-size);color:var(--crimson);letter-spacing:0.15em;margin-bottom:1rem">EXAMPLE OUTPUT</p>
+      <div class="risk-bar-item">
+        <div class="risk-bar-header">
+          <span class="cname">Iron Deficiency Anemia</span>
+          <span class="pct">74%</span>
+        </div>
+        <div class="risk-track"><div class="risk-fill" style="width:74%"></div></div>
+      </div>
+      <div class="risk-bar-item">
+        <div class="risk-bar-header">
+          <span class="cname">Hypothyroidism</span>
+          <span class="pct">41%</span>
+        </div>
+        <div class="risk-track"><div class="risk-fill" style="width:41%"></div></div>
+      </div>
+      <div class="risk-bar-item">
+        <div class="risk-bar-header">
+          <span class="cname">Type 2 Diabetes</span>
+          <span class="pct">28%</span>
+        </div>
+        <div class="risk-track"><div class="risk-fill" style="width:28%"></div></div>
+      </div>
+      <div class="risk-bar-item">
+        <div class="risk-bar-header">
+          <span class="cname">Liver Disease</span>
+          <span class="pct">12%</span>
+        </div>
+        <div class="risk-track"><div class="risk-fill" style="width:12%"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 14 — SHAP
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s14">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">13 — SHAP Explainability</p>
+  <h2 class="reveal">Why did the model predict that? SHAP shows you.</h2>
+
+  <div class="shap-layout reveal">
+    <div class="shap-desc">
+      <p>SHAP (SHapley Additive exPlanations) assigns a contribution value to each blood parameter for the predicted condition. Based on game theory — each feature's "fair share" of the prediction is calculated.</p>
+      <p><strong style="color:var(--crimson)">Crimson bars (positive SHAP)</strong> — this parameter increased the predicted condition's probability.</p>
+      <p><strong style="color:#4040B8">Blue bars (negative SHAP)</strong> — this parameter decreased the probability.</p>
+      <p>Bar length = magnitude of influence. Helps patients understand which specific lab values drove the ML result, not just what was predicted.</p>
+    </div>
+
+    <div class="shap-chart">
+      <p style="font-family:'JetBrains Mono',monospace;font-size:var(--small-size);color:var(--crimson);letter-spacing:0.15em;margin-bottom:1rem">SHAP — Iron Deficiency Anemia</p>
+
+      <div class="shap-row">
+        <span class="shap-feat">hemoglobin</span>
+        <div class="shap-bar-wrap">
+          <div class="shap-zero"></div>
+          <div class="shap-bar pos" style="width:38%"></div>
+        </div>
+        <span class="shap-val">+0.38</span>
+      </div>
+      <div class="shap-row">
+        <span class="shap-feat">mcv</span>
+        <div class="shap-bar-wrap">
+          <div class="shap-zero"></div>
+          <div class="shap-bar pos" style="width:28%"></div>
+        </div>
+        <span class="shap-val">+0.28</span>
+      </div>
+      <div class="shap-row">
+        <span class="shap-feat">mch</span>
+        <div class="shap-bar-wrap">
+          <div class="shap-zero"></div>
+          <div class="shap-bar pos" style="width:22%"></div>
+        </div>
+        <span class="shap-val">+0.22</span>
+      </div>
+      <div class="shap-row">
+        <span class="shap-feat">wbc</span>
+        <div class="shap-bar-wrap">
+          <div class="shap-zero"></div>
+          <div class="shap-bar neg" style="width:12%"></div>
+        </div>
+        <span class="shap-val">−0.12</span>
+      </div>
+      <div class="shap-row">
+        <span class="shap-feat">platelets</span>
+        <div class="shap-bar-wrap">
+          <div class="shap-zero"></div>
+          <div class="shap-bar neg" style="width:8%"></div>
+        </div>
+        <span class="shap-val">−0.08</span>
+      </div>
+      <div class="shap-row">
+        <span class="shap-feat">glucose</span>
+        <div class="shap-bar-wrap">
+          <div class="shap-zero"></div>
+          <div class="shap-bar neg" style="width:5%"></div>
+        </div>
+        <span class="shap-val">−0.05</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 15 — API REFERENCE
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s15">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">14 — API Reference</p>
+  <h2 class="reveal">8 endpoints. All prefixed <span style="color:var(--crimson)">/api/v1</span></h2>
+
+  <table class="api-table reveal">
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>Endpoint</th>
+        <th>Input</th>
+        <th>Returns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method-badge post">POST</span></td>
+        <td class="api-path">/reports/upload</td>
+        <td>multipart: file, age, sex</td>
+        <td>parameters[], simplification, anomaly_count</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge post">POST</span></td>
+        <td class="api-path">/analysis/zscore</td>
+        <td>JSON: parameters[], age, sex</td>
+        <td>z_scores[] with score, flag, direction</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge post">POST</span></td>
+        <td class="api-path">/analysis/isolation-forest</td>
+        <td>JSON: parameters[], age, sex</td>
+        <td>scores[] with anomaly_score, is_anomaly</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge post">POST</span></td>
+        <td class="api-path">/analysis/compare</td>
+        <td>JSON: parameters[], age, sex</td>
+        <td>comparisons[] with percentile, population stats</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge post">POST</span></td>
+        <td class="api-path">/analysis/predict</td>
+        <td>JSON: parameters[], age, sex, symptoms[]</td>
+        <td>top_condition, top_probability, all 15 proba</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge post">POST</span></td>
+        <td class="api-path">/analysis/explain</td>
+        <td>JSON: parameters[], age, sex, condition?</td>
+        <td>SHAP values per feature with direction</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge post">POST</span></td>
+        <td class="api-path">/risk/assess</td>
+        <td>JSON: parameters[], symptoms[], age, sex</td>
+        <td>conditions[] with risk_percent, requires_doctor</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge get">GET</span></td>
+        <td class="api-path">/risk/symptoms</td>
+        <td>None</td>
+        <td>string[] of symptom identifiers (45+)</td>
+      </tr>
+      <tr>
+        <td><span class="method-badge get">GET</span></td>
+        <td class="api-path">/health</td>
+        <td>None</td>
+        <td>{ status: "ok", version: string }</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 16 — BUG & FIX
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s16">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">15 — Engineering Challenge</p>
+  <h2 class="reveal">Why the model always predicted microcytic anemia — and how we fixed it.</h2>
+
+  <div class="bug-layout reveal">
+    <div class="bug-side">
+      <span class="side-tag">Root Cause</span>
+      <p style="font-size:var(--small-size);margin-bottom:0.6rem">Missing features were filled with <strong>sick-population medians</strong> computed from the imbalanced training data. Every absent parameter silently pushed predictions toward anemia.</p>
+
+      <div class="code-block">
+<span class="cmt"># Training dataset medians (skewed)</span>
+hemoglobin:  <span class="num">12.3</span> <span class="cmt"># below normal — anemia range</span>
+bun:         <span class="num">41.5</span> <span class="cmt"># 3× normal max</span>
+alp:        <span class="num">208.0</span> <span class="cmt"># 3× normal</span>
+albumin:      <span class="num">3.1</span> <span class="cmt"># below normal</span>
+creatinine:   <span class="num">1.3</span> <span class="cmt"># elevated</span>
+
+<span class="cmt"># Result: every CBC-only report looked like</span>
+<span class="cmt"># a sick patient with anemia + kidney issues</span>
+      </div>
+    </div>
+
+    <div class="fix-side">
+      <span class="side-tag">Fix Applied</span>
+      <p style="font-size:var(--small-size);margin-bottom:0.6rem">Added <code>_HEALTHY_DEFAULTS</code> dictionary in <code>classifier.py</code>. Missing features now use physiologically normal reference values — no retraining required.</p>
+
+      <div class="code-block">
+<span class="kw">_HEALTHY_DEFAULTS</span> = {
+  <span class="str">"hemoglobin"</span>:   <span class="num">14.0</span>,  <span class="cmt"># normal midpoint</span>
+  <span class="str">"bun"</span>:          <span class="num">14.0</span>,  <span class="cmt"># normal</span>
+  <span class="str">"alp"</span>:          <span class="num">70.0</span>,  <span class="cmt"># normal</span>
+  <span class="str">"albumin"</span>:       <span class="num">4.2</span>,  <span class="cmt"># normal</span>
+  <span class="str">"creatinine"</span>:    <span class="num">0.9</span>,  <span class="cmt"># normal</span>
+  <span class="cmt"># ... all 21 features</span>
+}
+<span class="cmt"># Result: absent features assumed healthy</span>
+<span class="cmt"># Prediction only reflects what's in the report</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 17 — LIMITATIONS & ROADMAP
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s17">
+  <div class="grid-bg"></div>
+
+  <p class="label reveal">16 — Limitations & Roadmap</p>
+  <h2 class="reveal">Where we are. Where we're going.</h2>
+
+  <div class="roadmap-grid reveal">
+    <div>
+      <h3 style="margin-bottom:0.8rem;color:var(--muted);font-size:var(--body-size)">Current Limitations</h3>
+      <ul class="limit-list">
+        <li>
+          <span class="badge now">NOW</span>
+          <span>Siloed datasets — each covers only one panel type, no patient has a full multi-panel profile in training data.</span>
+        </li>
+        <li>
+          <span class="badge now">NOW</span>
+          <span>~6,800 training rows is modest. CKD has only 400 rows — probability estimates may be unreliable.</span>
+        </li>
+        <li>
+          <span class="badge now">NOW</span>
+          <span>Image parsing quality depends on Groq Llama 4 Scout — non-standard or low-res formats may extract incorrectly.</span>
+        </li>
+        <li>
+          <span class="badge now">NOW</span>
+          <span>Single-snapshot analysis only. No longitudinal trend tracking across multiple reports.</span>
+        </li>
+        <li>
+          <span class="badge now">NOW</span>
+          <span>No clinical validation — the model has not been tested against confirmed diagnoses from real patients.</span>
+        </li>
+      </ul>
+    </div>
+
+    <div>
+      <h3 style="margin-bottom:0.8rem;color:var(--muted);font-size:var(--body-size)">Planned Improvements</h3>
+      <ul class="limit-list">
+        <li>
+          <span class="badge next" style="background: rgba(64,184,64,0.1); color: #40b840; border: 1px solid #40b840;">DONE</span>
+          <span style="color:#ffffff"><strong><del>XGBoost integration</del></strong> — Handles non-linear relationships. We achieved 95% test accuracy.</span>
+        </li>
+        <li>
+          <span class="badge next" style="background: rgba(64,184,64,0.1); color: #40b840; border: 1px solid #40b840;">DONE</span>
+          <span style="color:#ffffff"><strong><del>Derived ratio features</del></strong> — BUN/Creatinine, AST/ALT, MCH/MCV safely tracked and fed to XGBoost.</span>
+        </li>
+        <li>
+          <span class="badge next" style="background: rgba(64,184,64,0.1); color: #40b840; border: 1px solid #40b840;">DONE</span>
+          <span style="color:#ffffff"><strong><del>Unit normalisation</del></strong> — Implemented a robust sub-string standardizer that rescales shorthand clinical features.</span>
+        </li>
+        <li>
+          <span class="badge next">NEXT</span>
+          <span><strong>MIMIC-IV integration</strong> — millions of real ICU lab results with ICD-10 diagnoses. Full multi-panel per patient.</span>
+        </li>
+        <li>
+          <span class="badge future">FUTURE</span>
+          <span><strong>Longitudinal tracking</strong> — trend charts across multiple reports, flag parameters crossing normal/abnormal boundaries.</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SLIDE 18 — CLOSING
+     ═══════════════════════════════════════════ -->
+<section class="slide" id="s18">
+  <div class="grid-bg"></div>
+  <div class="noise"></div>
+
+  <h2 class="reveal">Blood reports should be readable by everyone.</h2>
+  <h1 class="reveal">HEALTHIFY</h1>
+  <p class="sub reveal" style="font-size:var(--body-size);color:var(--muted);max-width:60ch">One upload. Plain-English summary. Statistical anomaly scores. ML condition prediction. SHAP explainability. All free. All in the browser.</p>
+
+  <div class="closing-stats reveal">
+    <div class="closing-stat">
+      <span class="big">15</span>
+      <span class="desc">conditions classified</span>
+    </div>
+    <div class="closing-stat">
+      <span class="big">21</span>
+      <span class="desc">blood parameters</span>
+    </div>
+    <div class="closing-stat">
+      <span class="big">8</span>
+      <span class="desc">API endpoints</span>
+    </div>
+    <div class="closing-stat">
+      <span class="big">4</span>
+      <span class="desc">ML components</span>
+    </div>
+    <div class="closing-stat">
+      <span class="big">5</span>
+      <span class="desc">input formats</span>
+    </div>
+  </div>
+
+  <div class="links-row reveal">
+    <span class="link-item">github.com/medhxnsh/Healthily</span>
+    <span class="link-item">FastAPI · React · Groq · scikit-learn · SHAP</span>
+    <span class="link-item">Railway + Vercel · March 2026</span>
+  </div>
+
+  <p class="disclaimer">This tool does not provide medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider with any questions about your health.</p>
+</section>
+
+<!-- =============================================
+   CONTROLLER
+   ============================================= -->
+<script>
+(function () {
+  const slides = document.querySelectorAll('.slide');
+  const counter = document.getElementById('counter');
+  const progressBar = document.getElementById('progress-bar');
+  const total = slides.length;
+  let current = 0;
+  let isScrolling = false;
+
+  // ── Reveal on enter ──────────────────────────────
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+
+      // Update slide index
+      const idx = Array.from(slides).indexOf(entry.target);
+      if (idx !== -1) {
+        current = idx;
+        counter.textContent = String(idx + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
+        const pct = ((idx + 1) / total * 100).toFixed(2);
+        progressBar.style.width = pct + '%';
+      }
+
+      // Staggered reveal for children
+      const revealEls = entry.target.querySelectorAll('.reveal, .reveal-left');
+      revealEls.forEach((el, i) => {
+        setTimeout(() => {
+          el.classList.add('visible');
+        }, i * 80);
+      });
+
+      // Animate risk bars
+      entry.target.querySelectorAll('.risk-fill').forEach(bar => {
+        const w = bar.style.width;
+        bar.style.width = '0';
+        setTimeout(() => { bar.style.width = w; }, 300);
+      });
+    });
+  }, { threshold: 0.45 });
+
+  slides.forEach(s => observer.observe(s));
+
+  // ── Navigation ──────────────────────────────────
+  function goTo(idx) {
+    if (idx < 0 || idx >= total) return;
+    slides[idx].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function next() { goTo(current + 1); }
+  function prev() { goTo(current - 1); }
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault(); next();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault(); prev();
+    }
+  });
+
+  // Mouse wheel — throttled
+  let wheelTimeout;
+  document.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (wheelTimeout) return;
+    wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 900);
+    if (e.deltaY > 0) next(); else prev();
+  }, { passive: false });
+
+  // Touch swipe
+  let touchY = 0;
+  document.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dy = touchY - e.changedTouches[0].clientY;
+    if (Math.abs(dy) > 50) { if (dy > 0) next(); else prev(); }
+  }, { passive: true });
+})();
+</script>
+</body>
+</html>

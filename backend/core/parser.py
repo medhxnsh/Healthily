@@ -9,6 +9,7 @@ All parameter names are normalized to a canonical key (e.g. "Hb" → "hemoglobin
 """
 
 import io
+import re
 from dataclasses import dataclass
 
 import pandas as pd
@@ -16,13 +17,13 @@ import pandas as pd
 # Canonical name → list of aliases (case-insensitive)
 _ALIASES: dict[str, list[str]] = {
     "hemoglobin":       ["hemoglobin", "hb", "hgb", "haemoglobin"],
-    "rbc":              ["rbc", "red blood cells", "red blood cell count", "erythrocytes"],
-    "wbc":              ["wbc", "white blood cells", "white blood cell count", "leukocytes", "tbc"],
+    "rbc":              ["rbc", "red blood cells", "red blood cell count", "erythrocytes", "red blood cell"],
+    "wbc":              ["wbc", "white blood cells", "white blood cell count", "leukocytes", "tbc", "white blood cell"],
     "platelets":        ["platelets", "plt", "platelet count", "thrombocytes"],
     "hematocrit":       ["hematocrit", "hct", "packed cell volume", "pcv"],
-    "mcv":              ["mcv", "mean corpuscular volume"],
-    "mch":              ["mch", "mean corpuscular hemoglobin"],
-    "mchc":             ["mchc", "mean corpuscular hemoglobin concentration"],
+    "mcv":              ["mcv", "mean corpuscular volume", "mean cell volume"],
+    "mch":              ["mch", "mean corpuscular hemoglobin", "mean cell hemoglobin"],
+    "mchc":             ["mchc", "mean corpuscular hemoglobin concentration", "mean cell hb conc"],
     "glucose":          ["glucose", "blood glucose", "fasting glucose", "fbs", "rbs"],
     "hba1c":            ["hba1c", "hb a1c", "glycated hemoglobin", "glycohemoglobin", "a1c"],
     "cholesterol":      ["cholesterol", "total cholesterol", "tc"],
@@ -85,7 +86,33 @@ class ParseError(Exception):
 def normalize_name(raw: str) -> str | None:
     """Return canonical parameter name or None if unrecognized."""
     key = raw.strip().lower()
-    return _ALIAS_MAP.get(key)
+    if key in _ALIAS_MAP:
+        return _ALIAS_MAP[key]
+        
+    best_match = None
+    best_len = 0
+    for alias, canonical in _ALIAS_MAP.items():
+        if re.search(r'\b' + re.escape(alias) + r'\b', key):
+            if len(alias) > best_len:
+                best_match = canonical
+                best_len = len(alias)
+    
+    return best_match
+
+
+def normalize_value(canonical_name: str, value: float) -> float:
+    """Auto-scale parameters if they use shorthand units (e.g. 6.5 instead of 6500 for wbc)."""
+    if canonical_name == "wbc":
+        if 0 < value < 200:
+            return value * 1000.0
+    elif canonical_name == "platelets":
+        if 0 < value < 2000:
+            return value * 1000.0
+    elif canonical_name == "rbc":
+        # If entered as 4,500,000 instead of 4.5
+        if value > 10000:
+            return value / 1000000.0
+    return value
 
 
 def parse_csv(content: bytes) -> ParseResult:
@@ -148,6 +175,8 @@ def _parse_multirow(df: pd.DataFrame, name_col: str, value_col: str,
             unrecognized.append(raw_name)
             continue
 
+        value = normalize_value(canonical, value)
+
         parameters.append(BloodParameter(
             name=canonical,
             raw_name=raw_name,
@@ -179,6 +208,8 @@ def _parse_singlerow(df: pd.DataFrame) -> ParseResult:
         if canonical is None:
             unrecognized.append(raw_name)
             continue
+
+        value = normalize_value(canonical, value)
 
         parameters.append(BloodParameter(
             name=canonical,

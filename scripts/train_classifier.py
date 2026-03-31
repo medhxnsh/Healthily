@@ -176,20 +176,15 @@ def tune_and_train(
     print("\nTraining XGBoost (single pass, no grid search)...")
     xgb.fit(X_scaled, y)
 
-    # Calibrate probabilities — prefit=True avoids extra CV fits
-    print("Calibrating probabilities...")
-    calibrated = CalibratedClassifierCV(
-        estimator=xgb,
-        method="sigmoid",
-        cv="prefit",        # use already-trained model, no refit
-    )
-    calibrated.fit(X_scaled, y)
-
-    y_pred = calibrated.predict(X_scaled)
+    # We skip CalibratedClassifierCV because:
+    # 1. XGBoost's multi:softprob is already decent
+    # 2. Calibrating on the training set with cv='prefit' breaks probabilities
+    # 3. SHAP explainer does not support CalibratedClassifierCV wrappers
+    y_pred = xgb.predict(X_scaled)
     print("\nClassification report (training data):")
     print(classification_report(y, y_pred, zero_division=0))
 
-    return scaler, calibrated
+    return scaler, xgb
 
 
 def save(
